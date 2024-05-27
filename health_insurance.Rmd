@@ -6,14 +6,101 @@ date: "`r Sys.Date()`"
 
 ```{r setup}
 library(knitr)
-knitr::opts_chunk$set(cache = TRUE, cache.lazy = FALSE, warning = FALSE,
-                      message = FALSE, echo = TRUE, dpi = 180,
-                      fig.width = 6, fig.height = 5)
+knitr::opts_chunk$set(
+	fig.height = 5,
+	fig.width = 6,
+	message = FALSE,
+	warning = FALSE,
+	echo = TRUE,
+	cache = TRUE,
+	cache.lazy = FALSE,
+	dpi = 180)
 library(tidyverse)
 #remotes::install_github("juliasilge/silgelib")
 library(silgelib)
-theme_set(theme_light_plex())
+theme_set(theme_light(base_size = 12, base_family = "IBMPlexSans"))
 update_geom_defaults("rect", list(fill= "midnightblue", alpha = 0.8))
-update_geom_defaults("line", list(fill= "midnightblue", alpha = 0.8))
+```
+
+
+## Motivation
+
+Our modeling goal is to understand what affects the charges of health insurance on regions for the company. Here is the [link](https://search.r-project.org/CRAN/refmans/ExamPAData/html/health_insurance.html) to the dataset.
+
+
+## Explore data
+
+```{r}
+library(tidyverse)
+library(ExamPAData)
+data("health_insurance")
+dat <- health_insurance
+dat$sex <- as.factor(dat$sex)
+dat$smoker <- as.factor(dat$smoker)
+dat$region <- as.factor(dat$region)
+```
+
+```{r}
+unique(dat$region)
+summary(dat)
+```
+
+
+In the screencast I did more EDA, but here let’s just make one exploratory plot.
+
+```{r}
+dat %>%
+  mutate(region = fct_reorder(region, charges)) %>%
+  ggplot(aes(charges, region, fill = sex, color = sex)) +
+  geom_boxplot(position = position_dodge(preserve = "single"), alpha = 0.5) +
+  scale_x_log10(labels = scales::dollar) +
+  theme(legend.position = "top") +
+  scale_fill_brewer(palette = "Dark2") +
+  scale_color_brewer(palette = "Dark2") +
+  labs(y = NULL, color = NULL, fill = NULL, x = "Charges")
+```
+
+
+
+```{r}
+dat %>%
+  mutate(region = fct_reorder(region, charges)) %>%
+  ggplot(aes(charges, region, fill = smoker, color = smoker)) +
+  geom_boxplot(position = position_dodge(preserve = "single"), alpha = 0.5) +
+  scale_x_log10(labels = scales::dollar) +
+  theme(legend.position = "top") +
+  scale_fill_brewer(palette = "Dark2") +
+  scale_color_brewer(palette = "Dark2") +
+  labs(y = NULL, color = NULL, fill = NULL, x = "Charges")
+```
+
+## Modeling 
+
+```{r}
+ignore_region <- 
+  lm(charges ~ sex + age + bmi + children + smoker, data = dat)
+account_for_region <- 
+  lm(charges ~ sex + age + bmi + children + smoker + region, data = dat)
+```
+
+
+```{r}
+library(broom)
+bind_rows(
+  tidy(ignore_region) %>% mutate(region = "ignore"), 
+  tidy(account_for_region) %>% mutate(region = "account for region")
+) %>%
+  filter(!str_detect(term, "region"), term != "(Intercept)") %>%
+  ggplot(aes(estimate, term, color = region)) +
+  geom_vline(xintercept = 0, size = 1.5, lty = 2, color = "gray50") +
+  geom_errorbar(size = 1.4, alpha = 0.7,
+                aes(xmin = estimate - 1.96 * std.error, xmax = estimate + 1.96 * std.error)) +
+  geom_point(size = 3) +
+  scale_x_continuous(labels = scales::dollar) +
+  theme(legend.position="bottom") +
+  scale_color_brewer(palette = "Accent") +
+  labs(x = "Change in charges", y = NULL, color = "Include region in model?",
+       title = "Charges on Health Insurance",
+       subtitle = "Colleges spend less on women's sports overall\nFor the same sport, we don't see differences by gender")
 ```
 
