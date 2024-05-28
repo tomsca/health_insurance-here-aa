@@ -87,20 +87,52 @@ account_for_region <-
 ```{r}
 library(broom)
 bind_rows(
-  tidy(ignore_region) %>% mutate(region = "ignore"), 
-  tidy(account_for_region) %>% mutate(region = "account for region")
+  tidy(ignore_region) %>% mutate(region = "Ignore Region"), 
+  tidy(account_for_region) %>% mutate(region = "Account for Region")
 ) %>%
   filter(!str_detect(term, "region"), term != "(Intercept)") %>%
   ggplot(aes(estimate, term, color = region)) +
-  geom_vline(xintercept = 0, size = 1.5, lty = 2, color = "gray50") +
+  geom_vline(xintercept = 0, size = 1.5, lty = 2, color = "blue") +
   geom_errorbar(size = 1.4, alpha = 0.7,
                 aes(xmin = estimate - 1.96 * std.error, xmax = estimate + 1.96 * std.error)) +
   geom_point(size = 3) +
   scale_x_continuous(labels = scales::dollar) +
   theme(legend.position="bottom") +
   scale_color_brewer(palette = "Accent") +
-  labs(x = "Change in charges", y = NULL, color = "Include region in model?",
+  labs(x = "Change in Charges", y = NULL, color = "Include Region in model?",
        title = "Charges on Health Insurance",
-       subtitle = "Colleges spend less on women's sports overall\nFor the same sport, we don't see differences by gender")
+       subtitle = "Insurance Charges by Region and Other Factors")
+```
+
+## Bootstrap
+
+```{r}
+library(rsample)
+set.seed(123)
+ignore_intervals <- 
+  reg_intervals(charges ~ sex + age + bmi + children + smoker, data = dat, times = 500)
+
+set.seed(123)
+account_for_intervals <- 
+  reg_intervals(charges ~ sex + age + bmi + children + smoker + region, data = dat, times = 500)
+```
+
+```{r}
+bind_rows(
+  ignore_intervals %>% mutate(region = "ignore"), 
+  account_for_intervals %>% mutate(region = "account for region")
+) %>%
+  filter(!str_detect(term, "region")) %>%
+  ggplot(aes(.estimate, term, color = region)) +
+  geom_vline(xintercept = 0, size = 1.5, lty = 2, color = "blue") +
+  geom_errorbar(size = 1.4, alpha = 0.7,
+                aes(xmin = .lower, xmax = .upper)) +
+  geom_point(size = 3) +
+  scale_x_continuous(labels = scales::dollar) +
+  scale_color_brewer(palette = "Accent") +
+  theme(legend.position="bottom") +
+  labs(x = "Change in expenditures", y = NULL, color = "Include sport in model?",
+       title = "Bootstrap confidence intervals for expenditures in college sports",
+       subtitle = "Colleges spend less on women's sports overall\nIn any specific sport, we don't see evidence for differences")
 ```
 
